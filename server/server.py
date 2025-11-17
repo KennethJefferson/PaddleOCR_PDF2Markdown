@@ -38,10 +38,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
-# Suppress verbose PaddleOCR logging before importing modules
-logging.getLogger('ppocr').setLevel(logging.WARNING)
-logging.getLogger('paddle').setLevel(logging.WARNING)
-
 from pdf_processor import PDFProcessor
 from queue_manager import QueueManager
 
@@ -55,7 +51,6 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
-app.config['UPLOAD_FOLDER'] = '/tmp'  # Temporary storage for large uploads
 
 # Global variables
 queue_manager = None

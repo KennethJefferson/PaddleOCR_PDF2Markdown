@@ -11,10 +11,6 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-# Suppress PaddleOCR verbose logging
-logging.getLogger('ppocr').setLevel(logging.WARNING)
-logging.getLogger('paddle').setLevel(logging.WARNING)
-
 try:
     from paddleocr import PPStructure
 except ImportError:
@@ -54,7 +50,7 @@ class PDFProcessor:
             self.pipeline = PPStructure(
                 lang=lang,
                 use_gpu=config.get("use_gpu", False),
-                show_log=False,  # Disable verbose debug output
+                show_log=True,
                 table=True,            # Enable table recognition
                 structure_version='PP-StructureV2'  # Use structure version 2
             )
@@ -87,81 +83,37 @@ class PDFProcessor:
 
             # Process PDF with PaddleOCR PPStructure
             # Note: PPStructure in 2.8.1 returns different format
-            logger.info(f"Starting PDF processing...")
             result = self.pipeline(tmp_pdf_path)
-
-            # Get total pages for progress tracking
-            total_pages = len(result)
-            logger.info(f"Processing {total_pages} pages...")
 
             # Convert results to markdown format
             markdown_parts = []
             image_paths = []
 
-            # Progress tracking variables
-            last_reported_progress = 0
+            for idx, res in enumerate(result):
+                if res.get('type', '') == 'text':
+                    # Extract text content
+                    text = res.get('res', {}).get('text', '')
+                    if text:
+                        markdown_parts.append(text)
+                elif res.get('type', '') == 'table':
+                    # Extract table as HTML and convert to markdown table format
+                    html_table = res.get('res', {}).get('html', '')
+                    if html_table:
+                        markdown_parts.append(f"\n{html_table}\n")
+                elif res.get('type', '') == 'figure':
+                    # Handle figures/images
+                    img_path = res.get('res', {}).get('img_path', '')
+                    if img_path and output_dir:
+                        output_path = Path(output_dir)
+                        output_path.mkdir(parents=True, exist_ok=True)
+                        # Copy or save image to output directory
+                        image_paths.append(img_path)
+                        markdown_parts.append(f"\n![Figure {idx}]({img_path})\n")
 
-            # PPStructure returns a list of dictionaries
-            for idx, page_result in enumerate(result, 1):
-                # Report progress every 10% or every 10 pages (whichever is smaller)
-                progress = int((idx / total_pages) * 100)
-                if progress >= last_reported_progress + 10 or idx % 10 == 0:
-                    logger.info(f"Processing progress: {idx}/{total_pages} pages ({progress}%)")
-                    last_reported_progress = progress
-                # Each page_result can be a dict or contain multiple elements
-                if isinstance(page_result, dict):
-                    res_list = [page_result]
-                elif isinstance(page_result, list):
-                    res_list = page_result
-                else:
-                    continue
+            # Join all markdown parts
+            markdown_text = '\n'.join(markdown_parts)
 
-                for res in res_list:
-                    if isinstance(res, dict):
-                        res_type = res.get('type', '')
-
-                        if res_type == 'text':
-                            # Extract text content
-                            text = res.get('res', '')
-                            if isinstance(text, dict):
-                                text = text.get('text', '')
-                            elif isinstance(text, list):
-                                # Handle case where text is a list of OCR results
-                                text_items = []
-                                for item in text:
-                                    if isinstance(item, dict):
-                                        text_items.append(item.get('text', ''))
-                                    elif isinstance(item, list) and len(item) >= 2:
-                                        # Handle OCR result format [[text, confidence], ...]
-                                        text_items.append(str(item[0]) if item[0] else '')
-                                    else:
-                                        text_items.append(str(item))
-                                text = ' '.join(filter(None, text_items))
-                            if text:
-                                # Ensure text is a string before appending
-                                markdown_parts.append(str(text))
-                        elif res_type == 'table':
-                            # Extract table as HTML
-                            table_res = res.get('res', {})
-                            if isinstance(table_res, dict):
-                                html_table = table_res.get('html', '')
-                            else:
-                                html_table = str(table_res)
-                            if html_table:
-                                markdown_parts.append(f"\n{html_table}\n")
-                        elif res_type == 'figure':
-                            # Handle figures/images
-                            img_res = res.get('res', {})
-                            if isinstance(img_res, dict):
-                                img_path = img_res.get('img_path', '')
-                                if img_path and output_dir:
-                                    image_paths.append(img_path)
-                                    markdown_parts.append(f"\n![Figure {idx}]({img_path})\n")
-
-            # Join all markdown parts (ensuring all are strings)
-            markdown_text = '\n'.join(str(part) for part in markdown_parts)
-
-            logger.info(f"✓ Successfully converted PDF ({total_pages} pages processed, {len(markdown_text)} characters)")
+            logger.info(f"Successfully converted PDF to Markdown ({len(result)} elements processed)")
             return markdown_text, image_paths
 
         except Exception as e:
