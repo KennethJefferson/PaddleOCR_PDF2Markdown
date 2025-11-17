@@ -1,0 +1,12 @@
+{
+  "server_url": "https://YOUR-POD-ID-7777.proxy.runpod.net",
+  "poll_interval": 3.0,
+  "timeout": 600,
+  "workers": 2,
+  "_comments": {
+    "server_url": "Get this from RunPod dashboard -> Port 7777 HTTP Service. For local testing, use http://localhost:7777",
+    "poll_interval": "Seconds between status checks. Increase for slower networks (default: 3.0)",
+    "timeout": "Maximum seconds to wait for job completion. Increase for large PDFs (default: 600)",
+    "workers": "Number of parallel upload workers. Set to 1 for sequential processing (default: 2)"
+  }
+}

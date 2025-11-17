@@ -1,0 +1,6 @@
+{
+  "server_url": "https://8gnd6ikrks6zxz-7777.proxy.runpod.net",
+  "poll_interval": 3.0,
+  "timeout": 600,
+  "workers": 2
+}
